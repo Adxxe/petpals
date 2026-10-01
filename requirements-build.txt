@@ -1,0 +1,7 @@
+# 打包 Android APK 用的工具，只能在 Linux / WSL / macOS 上运行
+# 用法见 BUILD.md，不要装到手机或 Windows 的 Kivy 环境里
+#
+# 注意 cython 不要写 cython<3：老 Cython 生成的 C 代码对不上新版 CPython 的签名
+# （p4a 现在编的是 Python 3.14），会报 _PyLong_AsByteArray 参数不够。
+buildozer==1.6.0
+cython

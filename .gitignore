@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# 虚拟环境
+venv/
+.venv/
+env/
+
+# Buildozer / python-for-android 产物
+.buildozer/
+bin/
+*.apk
+*.aab
+*.idsig
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
+.DS_Store

@@ -1,0 +1,80 @@
+name: Build Android APK
+
+# 什么时候跑：
+#   手动点：仓库页面 -> Actions -> Build Android APK -> Run workflow
+# 故意**不**挂 push 触发：用 API 逐个文件上传会触发一堆重复任务，白烧额度。
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    # 用 22.04：p4a 依赖里的 libtinfo5 在 24.04 上没有，会装不上
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: 取出仓库代码
+        uses: actions/checkout@v4
+
+      - name: 装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # ★ 必须显式装 JDK 17：运行器默认 JAVA_HOME 指向 JDK 11，
+      #   而 Gradle 8 + Android Gradle Plugin 8 要求 Java 17，
+      #   否则会报 "Failed to apply plugin 'com.android.internal.application'"。
+      - name: 装 JDK 17（Gradle 必须）
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: 装打包需要的系统依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            git zip unzip openjdk-17-jdk python3-pip \
+            autoconf automake libtool pkg-config \
+            zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 \
+            cmake libffi-dev libssl-dev
+
+      # 缓存 Android SDK/NDK：第一次要下 1~2GB，之后几分钟
+      - name: 取回 buildozer 全局缓存（Android SDK/NDK）
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.buildozer
+          key: buildozer-global-${{ hashFiles('buildozer.spec') }}
+          restore-keys: buildozer-global-
+
+      - name: 缓存 buildozer 本地目录（中间产物）
+        uses: actions/cache@v4
+        with:
+          path: .buildozer
+          key: buildozer-local-${{ hashFiles('buildozer.spec') }}
+          restore-keys: buildozer-local-
+
+      - name: 装 buildozer
+        run: |
+          python -m pip install --upgrade pip
+          # cython 用新版：老 Cython 生成的 C 代码对不上 CPython 3.14 的签名
+          python -m pip install buildozer cython
+
+      - name: 打包（首次会下载 Android SDK/NDK，比较久）
+        run: |
+          yes | buildozer -v android debug
+
+      - name: 上传 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: petpals-debug-apk
+          path: bin/*.apk
+          if-no-files-found: error
+
+      # 就算这次失败也把 SDK/NDK 存下来，下次不用重下（省 ~10 分钟）
+      - name: 保存 buildozer 全局缓存（失败也保存）
+        if: always()
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.buildozer
+          key: buildozer-global-${{ hashFiles('buildozer.spec') }}
